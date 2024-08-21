@@ -1,8 +1,7 @@
 
 # UnitOfWork
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)![C# Version](https://img.shields.io/badge/C%23-7.0-blue)![.NET Version](https://img.shields.io/badge/.NET-4.7.2-blue)![License](https://img.shields.io/badge/license-MIT-blue)
-
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![C# Version](https://img.shields.io/badge/C%23-7.0%2B-blue) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Project Overview
 
