@@ -10,8 +10,6 @@ namespace UnitOfWorkDapper
         IOrderRepository Orders { get; }
         IOrderDetailRepository OrderDetails { get; }
 
-        void ExecuteInTransaction(Action action);
-
         void BeginTransaction();
         void Commit();
         void Rollback();
@@ -38,68 +36,22 @@ namespace UnitOfWorkDapper
             OrderDetails = orderDetailRepository;
         }
 
-        public void ExecuteInTransaction(Action action)
-        {
-            try
-            {
-                if (_connection.State != ConnectionState.Open)
-                {
-                    _connection.Open();
-                }
-
-                using (_transaction = _connection.BeginTransaction())
-                {
-                    SetTransactionInRepositories(_transaction);
-
-                    try
-                    {
-                        action();
-                        _transaction.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        try
-                        {
-                            _transaction.Rollback();
-                        }
-                        catch (Exception rollbackEx)
-                        {
-                            throw new Exception("Rollback failed after an exception occurred during the transaction.", rollbackEx);
-                        }
-
-                        throw new Exception("An error occurred during the transaction. The transaction has been rolled back.", ex);
-                    }
-                    finally
-                    {
-                        ResetTransactionInRepositories();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log the error if needed
-                throw new Exception("An error occurred while executing the transaction.", ex);
-            }
-        }
-
+        /// <summary>
+        /// Manually begin a new transaction.
+        /// </summary>
         public void BeginTransaction()
         {
-            try
+            if (_connection.State != ConnectionState.Open)
             {
-                if (_connection.State != ConnectionState.Open)
-                {
-                    _connection.Open();
-                }
-
-                _transaction = _connection.BeginTransaction();
-                SetTransactionInRepositories(_transaction);
+                _connection.Open();
             }
-            catch (Exception ex)
-            {
-                throw new Exception("An error occurred while beginning the transaction.", ex);
-            }
+            _transaction = _connection.BeginTransaction();
+            SetTransactionInRepositories(_transaction);
         }
 
+        /// <summary>
+        /// Commit the currently active transaction.
+        /// </summary>
         public void Commit()
         {
             try
@@ -116,6 +68,9 @@ namespace UnitOfWorkDapper
             }
         }
 
+        /// <summary>
+        /// Rollback the currently active transaction.
+        /// </summary>
         public void Rollback()
         {
             try
@@ -132,6 +87,18 @@ namespace UnitOfWorkDapper
             }
         }
 
+        /// <summary>
+        /// Dispose the transaction and connection.
+        /// </summary>
+        public void Dispose()
+        {
+            _transaction?.Dispose();
+            _connection?.Dispose();
+        }
+
+        /// <summary>
+        /// Assign the same transaction to all repositories.
+        /// </summary>
         private void SetTransactionInRepositories(IDbTransaction transaction)
         {
             Customers.SetTransaction(transaction);
@@ -139,6 +106,9 @@ namespace UnitOfWorkDapper
             OrderDetails.SetTransaction(transaction);
         }
 
+        /// <summary>
+        /// Clear out the transaction from the repositories.
+        /// </summary>
         private void ResetTransactionInRepositories()
         {
             _transaction?.Dispose();
@@ -147,12 +117,6 @@ namespace UnitOfWorkDapper
             Customers.SetTransaction(null);
             Orders.SetTransaction(null);
             OrderDetails.SetTransaction(null);
-        }
-
-        public void Dispose()
-        {
-            _transaction?.Dispose();
-            _connection?.Dispose();
         }
     }
 }

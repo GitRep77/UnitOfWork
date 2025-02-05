@@ -4,15 +4,15 @@ using UnitOfWorkAdoNet.Repositories;
 
 namespace UnitOfWorkAdoNet
 {
-    public interface IUnitOfWork : IDisposable
+    public interface IUnitOfWork
     {
         ICustomerRepository Customers { get; }
         IOrderDetailRepository OrderDetails { get; }
         IOrderRepository Orders { get; }
 
-        void ExecuteInTransaction(Action action);
         void BeginTransaction();
         void Commit();
+        void Dispose();
         void Rollback();
     }
 
@@ -37,50 +37,9 @@ namespace UnitOfWorkAdoNet
             OrderDetails = orderDetailRepository;
         }
 
-        public void ExecuteInTransaction(Action action)
-        {
-            try
-            {
-                if (_connection.State != ConnectionState.Open)
-                {
-                    _connection.Open();
-                }
-
-                using (_transaction = _connection.BeginTransaction())
-                {
-                    SetTransactionInRepositories(_transaction);
-
-                    try
-                    {
-                        action();
-                        _transaction.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        try
-                        {
-                            _transaction.Rollback();
-                        }
-                        catch (Exception rollbackEx)
-                        {
-                            throw new Exception("Rollback failed after an exception occurred during the transaction.", rollbackEx);
-                        }
-
-                        throw new Exception("An error occurred during the transaction. The transaction has been rolled back.", ex);
-                    }
-                    finally
-                    {
-                        ResetTransactionInRepositories();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log the error if required
-                throw new Exception("An error occurred during transaction execution.", ex);
-            }
-        }
-
+        /// <summary>
+        /// Explicitly begin a new transaction.
+        /// </summary>
         public void BeginTransaction()
         {
             try
@@ -89,7 +48,6 @@ namespace UnitOfWorkAdoNet
                 {
                     _connection.Open();
                 }
-
                 _transaction = _connection.BeginTransaction();
                 SetTransactionInRepositories(_transaction);
             }
@@ -99,6 +57,9 @@ namespace UnitOfWorkAdoNet
             }
         }
 
+        /// <summary>
+        /// Commit the current transaction.
+        /// </summary>
         public void Commit()
         {
             try
@@ -115,6 +76,9 @@ namespace UnitOfWorkAdoNet
             }
         }
 
+        /// <summary>
+        /// Rollback the current transaction.
+        /// </summary>
         public void Rollback()
         {
             try
@@ -131,6 +95,15 @@ namespace UnitOfWorkAdoNet
             }
         }
 
+        /// <summary>
+        /// Dispose of the transaction and connection.
+        /// </summary>
+        public void Dispose()
+        {
+            _transaction?.Dispose();
+            _connection?.Dispose();
+        }
+
         private void SetTransactionInRepositories(IDbTransaction transaction)
         {
             Customers.SetTransaction(transaction);
@@ -142,17 +115,9 @@ namespace UnitOfWorkAdoNet
         {
             _transaction?.Dispose();
             _transaction = null;
-
             Customers.SetTransaction(null);
             Orders.SetTransaction(null);
             OrderDetails.SetTransaction(null);
         }
-
-        public void Dispose()
-        {
-            _transaction?.Dispose();
-            _connection?.Dispose();
-        }
     }
-
 }
